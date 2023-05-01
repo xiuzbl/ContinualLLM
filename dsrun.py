@@ -104,18 +104,19 @@ def save(model, tokenizer, save_folder):
     print(f'Finished saving the tokenizer.', flush=True)
 
 def main(args):
-    try:
-        wandb.init(project=args.exp, dir=args.logging_dir)
-        use_wandb=True
-        print(f'Use Wandb to log~', flush=True)
-    except:
-        use_wandb=False
-        print(f'NOT Use Wandb.', flush=True)     
-
-
     rank = dist.get_rank()
     world_size = dist.get_world_size()
     device_id = rank % torch.cuda.device_count()
+
+    if rank<=0:
+        try:
+            wandb.init(project=args.exp, dir=args.logging_dir)
+            use_wandb=True
+            print(f'Use Wandb to log~', flush=True)
+        except:
+            use_wandb=False
+            print(f'NOT Use Wandb.', flush=True)     
+
 
     #* Align different configs.
     deepspeed_config = json.load(open(args.deepspeed_config, 'r', encoding='utf-8'))
@@ -176,12 +177,13 @@ def main(args):
         training_dataloader = DataLoader(train_dataset, collate_fn=data_collator, shuffle=True, batch_size=args.per_device_train_batch_size)
 
     num_update_steps_per_epoch = max(math.ceil(len(training_dataloader) // args.gradient_accumulation_steps), 1)
-    if args.max_train_steps is None:
+    if args.max_train_steps > 0:
         args.max_train_steps = math.ceil(args.num_epochs * num_update_steps_per_epoch)
-    else:
         args.num_epochs = args.max_train_steps // num_update_steps_per_epoch + int(
                           args.max_train_steps % num_update_steps_per_epoch > 0
                         )
+    else:
+        args.max_train_steps = math.ceil(args.num_epochs * num_update_steps_per_epoch)
 
     #* Set optimizer and scheduler, prepare them with accelerator.
     model, optimizer, trainable_param_names = get_optimizer(model, args)
@@ -194,7 +196,7 @@ def main(args):
     # optimizer = AdamW(params=model.parameters(), lr=args.lr) 
     scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer, 
-        num_warmup_steps=args.warmup_ratio*args.max_train_steps, 
+        num_warmup_steps=math.ceil(args.warmup_ratio * args.max_train_steps), 
         num_training_steps=args.max_train_steps
     )
     model, optimizer, _, scheduler = deepspeed.initialize(
@@ -226,6 +228,7 @@ def main(args):
     for epoch in range(args.num_epochs):
         logger.info(f"{'*'*10} EPOCH {epoch} {'*'*20}")
 
+        steps_in_epoch = len(training_dataloader)
         for step, batch in enumerate(training_dataloader):
             model.train()
             # if step == 0:
@@ -235,41 +238,46 @@ def main(args):
             batch = to_device(batch, device_id)
             outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['labels'])
             # outputs = model(**batch)
-            loss = outputs.loss
-            loss = loss / args.gradient_accumulation_steps
+            loss0 = outputs.loss
+            loss = loss0 / args.gradient_accumulation_steps
             model.backward(loss)
             # print(f'batch:{step}; loss: {type(loss)} {loss}', flush=True)
 
-            hh = 0
-            if step % args.gradient_accumulation_steps == 0 or step == len(training_dataloader) - 1:
-                # torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+            # hh = 0
+            if (step + 1) % args.gradient_accumulation_steps == 0 or (
+                steps_in_epoch <= args.gradient_accumulation_steps
+                and (step + 1) == steps_in_epoch
+            ):# last step in epoch but step is always smaller than gradient_accumulation_steps
+ 
+                # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 model.step()
                 # if rank <= 0:
                 #     logger.info(f'After optimization step memory INFO:') 
                 #     logger.info(f'Allocated: {torch.cuda.memory_allocated()}')
 
                 global_step += 1
-                loss = loss.item()
                 # for (param_name, param) in model.named_parameters():
                 #     if hh<10:
                 #         if param.requires_grad:
                 #             print(param_name, param.grad, param, flush=True)
                 #             hh += 1
 
-                scheduler.step()
                 model.zero_grad()
 
+                loss0 = loss0.item()
                 if rank <= 0:
                     step_ratio = float(step/len(training_dataloader)*100)
                     curr_lr = float(scheduler.get_last_lr()[0])
-                    # if use_wandb: 
-                    wandb.log({"epoch":epoch, "learned_data_ratio": step_ratio, "training_loss": float(loss), "lr":curr_lr}, step=global_step)
+                    if use_wandb: 
+                        wandb.log({"epoch":epoch, "learned_data_ratio": step_ratio, "training_loss": float(loss0), "lr":curr_lr}, step=global_step)
 
-                    train_writer.add_scalar('train/loss', float(loss), global_step)
+                    train_writer.add_scalar('train/loss', float(loss0), global_step)
                     train_writer.add_scalar('lr',curr_lr, global_step)
 
             if step % args.print_steps == 0 and rank<=0:
-                logger.info(f'EPOCH:{epoch}; GLOBAL STEP: {global_step}; STEP per epoch: {step}; learned_data_ratio: {"%.4f"%step_ratio}; training_loss: {loss}; lr:{"%.8f"%curr_lr}')
+                step_ratio = float(step/len(training_dataloader)*100)
+                curr_lr = float(scheduler.get_last_lr()[0])
+                logger.info(f'EPOCH:{epoch}; GLOBAL STEP: {global_step}; STEP per epoch: {step}; learned_data_ratio: {"%.4f"%step_ratio}; training_loss: {loss0}; lr:{"%.8f"%curr_lr}')
 
             if global_step >= args.max_train_steps:
                 break

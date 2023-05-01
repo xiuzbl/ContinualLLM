@@ -14,3 +14,4 @@ black
 black[jupyter]
 sentencepiece
 rouge_score
+tensorboard
