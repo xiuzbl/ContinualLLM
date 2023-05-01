@@ -1,0 +1,48 @@
+
+
+
+
+
+
+Loading checkpoint shards: 100%|██████████| 33/33 [00:12<00:00,  2.56it/s]
+The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. It may result in unexpected tokenization.
+The tokenizer class you load from this checkpoint is 'LLaMATokenizer'.
+The class this function is called from is 'LlamaTokenizer'.
+04/13/2023 22:43:25 - WARNING - datasets.builder -   Found cached dataset json (/root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e)
+100%|██████████| 1/1 [00:00<00:00, 652.30it/s]
+04/13/2023 22:43:25 - WARNING - datasets.arrow_dataset -   Loading cached split indices for dataset at /root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/cache-fc66add37a761515.arrow and /root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/cache-af7c524509875ad8.arrow
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+04/13/2023 22:44:19 - INFO - __main__ -   Prepare the dataloaders...
+Traceback (most recent call last):
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 141, in <module>
+    fire.Fire(main(args))
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 91, in main
+    model, optimizer, trainable_param_names = get_optimizer(model, args)
+  File "/mnt/data/yingxiu/LLMCODE/tools/get_optimizer.py", line 29, in get_optimizer
+    if type(config.trainable_param_names)==list: #* reset trainable parameters rather than that written in the config file.
+AttributeError: 'Namespace' object has no attribute 'trainable_param_names'

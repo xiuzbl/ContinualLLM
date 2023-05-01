@@ -1,0 +1,46 @@
+
+
+
+
+
+
+Loading checkpoint shards: 100%|██████████| 33/33 [00:12<00:00,  2.55it/s]
+The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. It may result in unexpected tokenization.
+The tokenizer class you load from this checkpoint is 'LLaMATokenizer'.
+The class this function is called from is 'LlamaTokenizer'.
+04/13/2023 22:28:38 - WARNING - datasets.builder -   Found cached dataset json (/root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e)
+100%|██████████| 1/1 [00:00<00:00, 644.09it/s]
+04/13/2023 22:28:38 - WARNING - datasets.arrow_dataset -   Loading cached split indices for dataset at /root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/cache-fc66add37a761515.arrow and /root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/cache-af7c524509875ad8.arrow
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+04/13/2023 22:29:32 - INFO - __main__ -   Prepare the dataloaders...
+Traceback (most recent call last):
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 140, in <module>
+    fire.Fire(main(args))
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 83, in main
+    num_update_steps_per_epoch = math.ceil(len(training_dataloader) / args.gradient_accumulation_steps)
+NameError: name 'math' is not defined

@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 141, in <module>
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 51, in main
+    prompter = Prompter(prompt_template_name)
+  File "/mnt/data/yingxiu/LLMCODE/tools/prompter.py", line 20, in __init__
+    raise ValueError(f"Can't read {file_name}")
+ValueError: Can't read templates/alpaca.json

@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 141, in <module>
+    fire.Fire(main(args))
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 51, in main
+    prompter = Prompter(prompt_template_name)
+NameError: name 'prompt_template_name' is not defined

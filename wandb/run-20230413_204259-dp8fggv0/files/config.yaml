@@ -1,0 +1,82 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.14.0
+    framework: huggingface
+    huggingface_version: 4.28.0.dev0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.9.16
+    start_time: 1681389780.077999
+    t:
+      1:
+      - 1
+      - 11
+      - 49
+      - 51
+      - 55
+      - 71
+      2:
+      - 1
+      - 11
+      - 49
+      - 51
+      - 55
+      - 71
+      3:
+      - 23
+      4: 3.9.16
+      5: 0.14.0
+      6: 4.28.0.dev0
+      8:
+      - 5
+data_path:
+  desc: null
+  value: /mnt/data/yingxiu/LLMDATA/alpaca_data_gpt4.json
+exp:
+  desc: null
+  value: test
+gradient_accumulation_steps:
+  desc: null
+  value: 8
+logging_dir:
+  desc: null
+  value: /mnt/data/yingxiu/LLMOUT/tblogs/test
+lr:
+  desc: null
+  value: 5.0e-05
+max_grad_norm:
+  desc: null
+  value: 1.0
+max_train_iter:
+  desc: null
+  value: null
+model_name_or_path:
+  desc: null
+  value: /mnt/data/yingxiu/llama-7b-hf
+num_epochs:
+  desc: null
+  value: 10
+output_dir:
+  desc: null
+  value: /mnt/data/yingxiu/LLMOUT/outputs/test
+per_device_eval_batch_size:
+  desc: null
+  value: 4
+per_device_train_batch_size:
+  desc: null
+  value: 2
+print_steps:
+  desc: null
+  value: 100
+scheduler:
+  desc: null
+  value: linear_decay_with_warmup
+val_size:
+  desc: null
+  value: 2000
+warmup_ratio:
+  desc: null
+  value: 0.0

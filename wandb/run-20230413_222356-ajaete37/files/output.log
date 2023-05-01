@@ -1,0 +1,33 @@
+
+
+
+
+
+
+Loading checkpoint shards: 100%|██████████| 33/33 [00:13<00:00,  2.47it/s]
+The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. It may result in unexpected tokenization.
+The tokenizer class you load from this checkpoint is 'LLaMATokenizer'.
+The class this function is called from is 'LlamaTokenizer'.
+04/13/2023 22:24:57 - WARNING - datasets.builder -   Found cached dataset json (/root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e)
+100%|██████████| 1/1 [00:00<00:00, 630.63it/s]
+04/13/2023 22:24:57 - WARNING - datasets.arrow_dataset -   Loading cached split indices for dataset at /root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/cache-fc66add37a761515.arrow and /root/.cache/huggingface/datasets/json/default-0cb8404fb3cb3961/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/cache-af7c524509875ad8.arrow
+Traceback (most recent call last):
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 140, in <module>
+    fire.Fire(main(args))
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 70, in main
+    train_val["train"].shuffle().map(lambda x: generate_and_tokenize_prompt(x, prompter, tokenizer, args)))
+  File "/mnt/data/yingxiu/xiuenvs/alpaca3.9/lib/python3.9/site-packages/datasets/arrow_dataset.py", line 563, in wrapper
+    out: Union["Dataset", "DatasetDict"] = func(self, *args, **kwargs)
+  File "/mnt/data/yingxiu/xiuenvs/alpaca3.9/lib/python3.9/site-packages/datasets/arrow_dataset.py", line 528, in wrapper
+    out: Union["Dataset", "DatasetDict"] = func(self, *args, **kwargs)
+  File "/mnt/data/yingxiu/xiuenvs/alpaca3.9/lib/python3.9/site-packages/datasets/arrow_dataset.py", line 3004, in map
+    for rank, done, content in Dataset._map_single(**dataset_kwargs):
+  File "/mnt/data/yingxiu/xiuenvs/alpaca3.9/lib/python3.9/site-packages/datasets/arrow_dataset.py", line 3358, in _map_single
+    example = apply_function_on_filtered_inputs(example, i, offset=offset)
+  File "/mnt/data/yingxiu/xiuenvs/alpaca3.9/lib/python3.9/site-packages/datasets/arrow_dataset.py", line 3261, in apply_function_on_filtered_inputs
+    processed_inputs = function(*fn_args, *additional_args, **fn_kwargs)
+  File "/mnt/data/yingxiu/LLMCODE/run.py", line 70, in <lambda>
+    train_val["train"].shuffle().map(lambda x: generate_and_tokenize_prompt(x, prompter, tokenizer, args)))
+  File "/mnt/data/yingxiu/LLMCODE/utils.py", line 32, in generate_and_tokenize_prompt
+    if not train_on_inputs:
+NameError: name 'train_on_inputs' is not defined
