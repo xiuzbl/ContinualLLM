@@ -10,6 +10,7 @@ eflopdir=/mnt/user/E-zhaoyingxiu.zyx-354256
 # exp=$job
 # job=llama_gpt4_run2
 job=llama_gpt4_run0
+# job=llama_gpt4_1epoch
 # exp=${now}${dir}_$job
 exp=${now}eflop_$job
 echo Experiment: $exp
@@ -26,14 +27,16 @@ trainbtz=2
 evalbtz=4
 # grad_accu=4
 grad_accu=8
+# grad_accu=1
 # grad_accu=2
 # add_lora=true #!
 add_lora=
-echo train_batch_size $trainbtz
+echo train_batch_size: $trainbtz
+echo gradient_accumulation_step: $grad_accu
 echo Add LoRA: $add_lora
 
 # epoch=10
-# epoch=1
+# epoch=2
 # epoch=5
 epoch=3
 lr=2e-5 # tune llama
@@ -50,6 +53,8 @@ echo warmup_steps: $warmup_steps
 
 # max_length=2048
 max_length=1024
+print_steps=10
+# print_steps=1
 
 datapath=$eflopdir/LLMDATA/alpaca_data_gpt4.json
 # datapath=$eflopdir/LLMDATA/mixed_inst_trans.json
@@ -102,4 +107,5 @@ $run \
     --logging_dir=$tbdir \
     --add_lora=$add_lora \
     --model_max_length=$max_length \
+    --print_steps=$print_steps \
     >$log 2>&1
