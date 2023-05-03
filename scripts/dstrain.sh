@@ -53,7 +53,7 @@ echo warmup_steps: $warmup_steps
 
 # max_length=2048
 max_length=1024
-print_steps=10
+print_steps=20
 # print_steps=1
 
 datapath=$eflopdir/LLMDATA/alpaca_data_gpt4.json

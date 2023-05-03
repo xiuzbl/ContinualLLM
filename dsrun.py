@@ -29,10 +29,14 @@ from transformers import (
     LlamaForCausalLM, 
     LlamaTokenizer, 
     get_linear_schedule_with_warmup, 
-    get_cosine_schedule_with_warmup,
+    # get_cosine_schedule_with_warmup,
     set_seed,
 )
+from functools import partial
+from torch.optim.lr_scheduler import LambdaLR
+from torch.optim import Optimizer
 import deepspeed
+from deepspeed.runtime.utils import clip_grad_norm_
 import torch.distributed as dist
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
@@ -41,11 +45,51 @@ torch.autograd.set_detect_anomaly(True)
 # torch.backends.cuda.matmul.allow_tf32 = True
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def to_device(batch, device):
+def get_cosine_schedule_with_warmup(
+    optimizer: Optimizer, num_warmup_steps: int, num_training_steps: int, num_cycles: float = 0.5, last_epoch: int = -1
+):
+    """
+    Create a schedule with a learning rate that decreases following the values of the cosine function between the
+    initial lr set in the optimizer to 0, after a warmup period during which it increases linearly between 0 and the
+    initial lr set in the optimizer.
+
+    Args:
+        optimizer ([`~torch.optim.Optimizer`]):
+            The optimizer for which to schedule the learning rate.
+        num_warmup_steps (`int`):
+            The number of steps for the warmup phase.
+        num_training_steps (`int`):
+            The total number of training steps.
+        num_cycles (`float`, *optional*, defaults to 0.5):
+            The number of waves in the cosine schedule (the defaults is to just decrease from the max value to 0
+            following a half-cosine).
+        last_epoch (`int`, *optional*, defaults to -1):
+            The index of the last epoch when resuming training.
+
+    Return:
+        `torch.optim.lr_scheduler.LambdaLR` with the appropriate schedule.
+    """
+
+    lr_lambda = partial(
+        _get_cosine_schedule_with_warmup_lr_lambda,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps,
+        num_cycles=num_cycles,
+    )
+    return LambdaLR(optimizer, lr_lambda, last_epoch)
+
+def _get_cosine_schedule_with_warmup_lr_lambda(
+    current_step: int, *, num_warmup_steps: int, num_training_steps: int, num_cycles: float):
+    if current_step < num_warmup_steps:
+        return float(current_step) / float(max(1, num_warmup_steps))
+    progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+    return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+
+def to_device(batch, device_id):
     output = {}
     for k, v in batch.items():
         try:
-            output[k] = v.to(device)
+            output[k] = v.to(device_id)
         except:
             output[k] = v
     return output
@@ -124,7 +168,8 @@ def main(args):
     # assert deepspeed_config['gradient_accumulation_steps'] == args.gradient_accumulation_steps
     assert deepspeed_config['train_micro_batch_size_per_gpu'] == args.per_device_train_batch_size
 
-    model = LlamaForCausalLM.from_pretrained(args.model_name_or_path, device_map={"": device})
+    # model = LlamaForCausalLM.from_pretrained(args.model_name_or_path, device_map={"": device_id})
+    model = LlamaForCausalLM.from_pretrained(args.model_name_or_path)
 
     if args.add_lora:
         if rank<=0: logger.info('Add LoRA to the backbone model...')
@@ -146,22 +191,24 @@ def main(args):
                     use_fast=False,
                 )
     # print(f'pad_token {tokenizer.pad_token}', flush=True)
+    special_tokens_dict = dict()
     if tokenizer.pad_token is None:
-        model, tokenizer = smart_tokenizer_and_embedding_resize(
-            special_tokens_dict=dict(pad_token=DEFAULT_PAD_TOKEN),
-            tokenizer=tokenizer,
-            model=model,
-        )
+        special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
+    if tokenizer.eos_token is None:
+        special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
+    if tokenizer.bos_token is None:
+        special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
+    if tokenizer.unk_token is None:
+        special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
+
+    smart_tokenizer_and_embedding_resize(
+        special_tokens_dict=special_tokens_dict,
+        tokenizer=tokenizer,
+        model=model,
+    )    
     # print(f'pad_token {tokenizer.pad_token}', flush=True)
     # if "llama" in args.model_name_or_path.lower():
-    tokenizer.add_special_tokens(
-        {
-            "eos_token": DEFAULT_EOS_TOKEN,
-            "bos_token": DEFAULT_BOS_TOKEN,
-            "unk_token": DEFAULT_UNK_TOKEN,
-        }
-    )
- 
+
     if rank<=0: 
         train_writer = SummaryWriter(os.path.join(args.logging_dir, 'train'), flush_secs=10)
         logger.info(f"Prepare the dataloaders...")
@@ -186,7 +233,7 @@ def main(args):
         args.max_train_steps = math.ceil(args.num_epochs * num_update_steps_per_epoch)
 
     #* Set optimizer and scheduler, prepare them with accelerator.
-    model, optimizer, trainable_param_names = get_optimizer(model, args)
+    _, optimizer, trainable_param_names = get_optimizer(model, args)
     # scheduler = get_scheduler(optimizer=optimizer, config=args)
     # scheduler = get_linear_schedule_with_warmup(
     #                 optimizer=optimizer, 
@@ -194,21 +241,23 @@ def main(args):
     #                 num_training_steps=args.max_train_steps
                 # )
     # optimizer = AdamW(params=model.parameters(), lr=args.lr) 
+
     scheduler = get_cosine_schedule_with_warmup(
         optimizer=optimizer, 
         num_warmup_steps=math.ceil(args.warmup_ratio * args.max_train_steps), 
         num_training_steps=args.max_train_steps
     )
+    # print(f'scheduler first {scheduler}', flush=True)
     # model_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
+    # model = model.to(device_id)
     model, optimizer, _, scheduler = deepspeed.initialize(
         model=model,
         optimizer=optimizer,
         lr_scheduler=scheduler,
-        dist_init_required=True,
+        dist_init_required=False,
         args=args
     )
-
-    model = model.to(device)
+    print(f'scheduler {scheduler}', flush=True)
     model.train()
     # wandb.watch(model, log_freq=4)
 
@@ -243,21 +292,27 @@ def main(args):
             loss0 = outputs.loss
             loss = loss0 / args.gradient_accumulation_steps
             model.backward(loss)
+            model.micro_steps += 1
 
             # print(f'batch:{step}; loss: {type(loss)} {loss}', flush=True)
 
-            # model.step()
             # if rank <= 0:
             #     logger.info(f'After optimization step memory INFO:') 
             #     logger.info(f'Allocated: {torch.cuda.memory_allocated()}')
             curr_lr = float(scheduler.get_last_lr()[0])
             step_ratio = float(step/len(training_dataloader)*100)
             losses.append(loss0.item())
+            # if rank<=0: print(f'ds_global_step:{model.global_steps}; ds_lr: {model.lr_scheduler.state_dict()}', flush=True)
             # loss = loss0 / args.gradient_accumulation_steps
             if (step + 1) % args.gradient_accumulation_steps == 0 or (steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch):# last step in epoch but step is always smaller than gradient_accumulation_steps
-                optimizer.step()
-                scheduler.step()
-                model.zero_grad()
+                # model.step()
+                clip_grad_norm_(parameters=model.module.parameters(), max_norm=model.gradient_clipping(), mpu=model.mpu)
+                model.optimizer.step()
+                model.lr_scheduler.step()
+                model.optimizer.zero_grad()
+                model.global_steps += 1
+                model.global_samples += model.train_batch_size() * args.gradient_accumulation_steps
+
                 global_step += 1
 
             if step % args.print_steps == 0:
@@ -281,7 +336,7 @@ def main(args):
             os.makedirs(args.output_dir, exist_ok=True)
             os.makedirs(save_folder, exist_ok=True)
             # logger.info(f'Begin saving model to {save_folder}')
-            save(model, tokenizer, save_folder)
+            # save(model, tokenizer, save_folder)
             # model.save_checkpoint(save_folder)
             if args.add_lora:
                 model.save_pretrained(os.path.join(args.output_dir,'epoch_'+str(epoch)))
