@@ -1,17 +1,21 @@
 # dir=root
-gpuid=1
+gpuid=$1
 echo GPUID $gpuid
-dir=mnt
+# dir=mnt
+eflopdir=/mnt/user/E-zhaoyingxiu.zyx-354256
 # add_lora=true
 # replace_lora=true
 add_lora=
 replace_lora=
 
-log=/$dir/data/yingxiu/alpaca-lora/logs/eval_test.log
-py=/$dir/data/yingxiu/xiuenvs/alpaca3.9/bin/python
+# log=/$dir/data/yingxiu/alpaca-lora/logs/eval_test.log
+# py=/$dir/data/yingxiu/xiuenvs/alpaca3.9/bin/python
+env=/mnt/user/E-zhaoyingxiu.zyx-354256/envs/py39/bin
+py=$env/python
 
+prt_model=$eflopdir/MODELS/llama-7b-hf
 # prt_model=/$dir/data/yingxiu/huggyllama-7b
-prt_model=/$dir/data/yingxiu/llama-7b-hf
+# prt_model=/$dir/data/yingxiu/llama-7b-hf
 # prt_model=/$dir/data/yingxiu/chavinlo-alpaca-native
 # only_prt=true
 # model_path=$prt_model
@@ -37,8 +41,11 @@ only_prt=
 # lorapath=/mnt/data/yingxiu/LLMOUT/outputs/lora_debug/epoch_0
 # model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_lora_mix_run0/epoch_2
 # model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_llama_gpt4_run1
-model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_llama_cleaned_lr1e-5_run0
+# model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_llama_cleaned_lr1e-5_run0
 # model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_lora_mix_run1/epoch_2
+# model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0503eflop_llama_gpt4_run0
+model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/CODE/stanford_alpaca/outputs/0503eflop_llama_gpt4_run1
+# model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0502eflop_llama_gpt4_run0
 lorapath=$model_path
 
 # lorapath=/$dir/data/yingxiu/alpaca-lora-7b/adapter_model.bin
@@ -65,7 +72,7 @@ echo tokenizer_path: $tokenizer_path
 
 echo Begin Generating...
 # py=python
-file=/$dir/data/yingxiu/LLMCODE/generate.py
+file=$eflopdir/CODE/ContinualLLM/generate.py
 CUDA_VISIBLE_DEVICES=$gpuid \
 $py $file \
     --model_name_or_path=${model_path}/pytorch_model.bin \

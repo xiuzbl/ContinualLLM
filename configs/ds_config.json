@@ -25,9 +25,18 @@
     },
     "zero_allow_untested_optimizer": true,
     "zero_force_ds_cpu_optimizer": false,
-    "gradient_accumulation_steps": 1,
-    "gradient_clipping":1.0,
-    "steps_per_print": 100,
+    "gradient_accumulation_steps": 4,
+    "gradient_clipping":2.0, 
+    "steps_per_print": 2,
     "train_micro_batch_size_per_gpu": 2,
-    "wall_clock_breakdown": false
+    "wall_clock_breakdown": false,
+    "scheduler": {
+      "type": "WarmupDecayLR",
+      "params": {
+          "warmup_min_lr": 1e-6,
+          "warmup_max_lr": 2e-5,
+          "warmup_num_steps": 10,
+          "total_num_steps": 1000
+      }
+  }
 }
