@@ -13,14 +13,17 @@ replace_lora=
 env=/mnt/user/E-zhaoyingxiu.zyx-354256/envs/py39/bin
 py=$env/python
 
-prt_model=$eflopdir/MODELS/llama-7b-hf
+# prt_model=$eflopdir/MODELS/llama-7b-hf
 # prt_model=/$dir/data/yingxiu/huggyllama-7b
 # prt_model=/$dir/data/yingxiu/llama-7b-hf
 # prt_model=/$dir/data/yingxiu/chavinlo-alpaca-native
-# only_prt=true
-# model_path=$prt_model
+only_prt=true
+# prt_model=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0503eflop_llama_gpt4_run0
+prt_model=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0504eflop_lora_mix_chavinlo-alpaca_run0/epoch_4/model_replaced
+# prt_model=/mnt/user/E-zhaoyingxiu.zyx-354256/MODELS/chavinlo-alpaca-native
+model_path=$prt_model
 
-only_prt=
+# only_prt=
 
 # model_path=/$dir/data/yingxiu/llama-7b-hf
 # model_path=chavinlo/alpaca-native
@@ -44,7 +47,8 @@ only_prt=
 # model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_llama_cleaned_lr1e-5_run0
 # model_path=/mnt/data/yingxiu/LLMOUT/outputs/0424root_lora_mix_run1/epoch_2
 # model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0503eflop_llama_gpt4_run0
-model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/CODE/stanford_alpaca/outputs/0503eflop_llama_gpt4_run1
+# model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/CODE/stanford_alpaca/outputs/0503eflop_llama_gpt4_run1
+# model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0504eflop_lora_mix_run0/epoch_1
 # model_path=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0502eflop_llama_gpt4_run0
 lorapath=$model_path
 
@@ -63,6 +67,11 @@ lorapath=$model_path
 # tokenizer_path=/mnt/data/yingxiu/LLMOUT/outputs/debug
 tokenizer_path=$model_path
 # echo epoch 1
+# output_dir=$outdir
+outdir=$model_path
+inputpath=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMDATA/wmt_test.json
+echo output_dir: $outdir
+echo evaluate_input: $inputpath
 
 echo add_lora: $add_lora
 echo only pretrained model: $only_prt
@@ -81,7 +90,9 @@ $py $file \
     --lora_weights=$lorapath \
     --replace_lora_weights=$replace_lora \
     --only_pretrained_model=$only_prt \
-    --tokenizer_path=$tokenizer_path 
+    --tokenizer_path=$tokenizer_path  \
+    --output_dir=$outdir \
+    --input_file=$inputpath 
     # >$log 2>&1
 
 echo Finish! Congrats!

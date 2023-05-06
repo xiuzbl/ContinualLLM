@@ -10,6 +10,7 @@ from mypeft import PeftModel
 from transformers import GenerationConfig, LlamaForCausalLM, LlamaTokenizer, AutoTokenizer, AutoModelForCausalLM
 import argparse
 # from utils.callbacks import Iteratorize, Stream
+import json
 
 if torch.cuda.is_available():
     device = "cuda"
@@ -30,6 +31,8 @@ parser.add_argument('--add_lora', type=bool, default=False)
 parser.add_argument('--only_pretrained_model', type=bool, default=False)
 parser.add_argument('--lora_weights', type=str, default='tloen/alpaca-lora-7b')
 parser.add_argument('--replace_lora_weights', type=bool, default=False)
+parser.add_argument('--output_dir', type=str, default=None)
+parser.add_argument('--input_file', type=str, default=None)
 args = parser.parse_args()
 
 prompt_template = ""  # The prompt template to use, will default to alpaca.
@@ -47,11 +50,22 @@ if args.add_lora:
         args.pretrained_model_path,
         device_map={"":device}
     )
+    special_tokens_dict = dict()
+    if tokenizer.pad_token is None:
+        special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
+    if tokenizer.eos_token is None:
+        special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
+    if tokenizer.bos_token is None:
+        special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
+    if tokenizer.unk_token is None:
+        special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
+
     model, tokenizer = smart_tokenizer_and_embedding_resize(
-        special_tokens_dict=dict(pad_token=DEFAULT_PAD_TOKEN),
+        special_tokens_dict=special_tokens_dict,
         tokenizer=tokenizer,
         model=model,
-    )
+    )    
+
     print('Here! Load from pretrained lora weights', flush=True)
     model = PeftModel.from_pretrained(
         model,
@@ -66,35 +80,35 @@ elif args.only_pretrained_model:
     )
 else:
     # model = AutoModelForCausalLM.from_pretrained("chavinlo/alpaca-native")
-    # model = LlamaForCausalLM.from_pretrained(
-    #      args.pretrained_model_path,
-    #     device_map={"":device}
-    # )
-    # special_tokens_dict = dict()
-    # if tokenizer.pad_token is None:
-    #     special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
-    # if tokenizer.eos_token is None:
-    #     special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
-    # if tokenizer.bos_token is None:
-    #     special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
-    # if tokenizer.unk_token is None:
-    #     special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
-
-    # model, tokenizer = smart_tokenizer_and_embedding_resize(
-    #     special_tokens_dict=special_tokens_dict,
-    #     tokenizer=tokenizer,
-    #     model=model,
-    # )    
-    
-    # model.load_state_dict(args.model_name_or_path)
-    print(f'Begin loading the trained checkpoint~', flush=True)
-    # ckp_state_dict = torch.load(args.model_name_or_path, map_location=device)
-    # model.load_state_dict(ckp_state_dict, strict=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name_or_path, 
+    model = LlamaForCausalLM.from_pretrained(
+         args.pretrained_model_path,
         device_map={"":device}
     )
-    print(f'Finish loading the trained checkpoint~', flush=True)
+    special_tokens_dict = dict()
+    if tokenizer.pad_token is None:
+        special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
+    if tokenizer.eos_token is None:
+        special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
+    if tokenizer.bos_token is None:
+        special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
+    if tokenizer.unk_token is None:
+        special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
+
+    model, tokenizer = smart_tokenizer_and_embedding_resize(
+        special_tokens_dict=special_tokens_dict,
+        tokenizer=tokenizer,
+        model=model,
+    )    
+    
+    # model.load_state_dict(args.model_name_or_path)
+    # print(f'Begin loading the trained checkpoint~', flush=True)
+    # ckp_state_dict = torch.load(args.model_name_or_path, map_location=device)
+    # model.load_state_dict(ckp_state_dict, strict=True)
+    # model = AutoModelForCausalLM.from_pretrained(
+    #     args.model_name_or_path, 
+    #     device_map={"":device}
+    # )
+    # print(f'Finish loading the trained checkpoint~', flush=True)
     # model = model.cuda()
 # model.print_trainable_parameters()
 
@@ -128,7 +142,7 @@ def evaluate(
     **kwargs,
 ):
     prompt = prompter.generate_prompt(instruction, input)
-    print(f'Input sentence: {prompt}', flush=True)
+    # print(f'Input sentence: {prompt}', flush=True)
     inputs = tokenizer(prompt, return_tensors="pt")
     input_ids = inputs["input_ids"].to(device)
     generation_config = GenerationConfig(
@@ -164,8 +178,8 @@ def evaluate(
 
 
 # TODO Evaluating----------------------------------------------------------------
-while True:
-# while False:
+# while True:
+while False:
     # instruction = "List which tasks you can solve as a language model."
     # print("Response:\n", evaluate(instruction, stream_output=False))
     print(f'{"-"*20}', flush=True)
@@ -189,6 +203,36 @@ while True:
 
     print("Response>>\n", evaluate(instruction, input=input_sentence, stream_output=False))
     print(f'{"*"*20}', flush=True)
+
+if True:
+    with open(args.input_file, 'r') as fr:
+        data = json.load(fr)
+    print(f'Total number of evaluation samples {len(data)}', flush=True)
+
+    output_file = os.path.join(args.output_dir, 'pred_trans.json')
+    with open(output_file, 'a+') as fw: 
+        for i in range(100):
+            sample = data[i]
+            print(f"Eval-{i}-th sample: {sample['input']}", flush=True)
+            res = {}
+            instruction = "Translate the following sentence from English to Chinese."
+            input_sentence = str(sample['input'])
+            response = evaluate(instruction, input=input_sentence, stream_output=False).strip()
+
+            if '</s>' in response:
+                response = response.replace('</s>', '')
+            if '<s>' in response:
+                response = response.replace('<s>', '')
+            
+            res['input'] = input_sentence
+            res['pred'] = response
+            print(json.dumps(res, ensure_ascii=False), file=fw)
+
+print(f'Congrats!!!')
+
+
+
+
 # instruction = "List which tasks you can solve as a language model."
 # instruction = "Give some diverse examples for question-answering tasks."
 # instruction = "Evaluate the above examples, are they correctly answered?"

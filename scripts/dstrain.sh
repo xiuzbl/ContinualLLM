@@ -5,12 +5,16 @@ echo DATE: $now
 # dir=mnt
 eflopdir=/mnt/user/E-zhaoyingxiu.zyx-354256
 # exp=${now}_test_lr3e-4
-job=debug
+# job=debug
 # job=lora_debug
 # exp=$job
 # job=llama_gpt4_run2
 # job=llama_gpt4_lr1e-5_run1
 # job=llama_gpt4_1epoch
+# job=lora_mix_chavinlo-alpaca_run0
+# job=llama_gpt4_linear-scheduler_run0
+job=alpaca_mix_full_run0
+
 # exp=${now}${dir}_$job
 exp=${now}eflop_$job
 echo Experiment: $exp
@@ -25,8 +29,8 @@ ngpu=8 #! dlc
 trainbtz=2
 # trainbtz=8
 evalbtz=4
-grad_accu=4
-# grad_accu=8
+# grad_accu=4
+grad_accu=8
 # grad_accu=1
 # grad_accu=2
 # add_lora=true #!
@@ -40,8 +44,7 @@ echo Add LoRA: $add_lora
 epoch=5
 # epoch=3
 lr=2e-5 # tune llama
-# lr=1e-4
-# lr=1e-4 # tune lora
+# lr=1e-4 #! tune lora
 warmup_ratio=0.03
 # warmup_ratio=0.0
 # warmup_steps=100
@@ -58,14 +61,17 @@ print_steps=20
 # print_steps=1
 
 # datapath=$eflopdir/LLMDATA/alpaca_data_gpt4.json
+datapath=$eflopdir/LLMDATA/5000_mixed_inst_trans.json # total 1w samples
 # datapath=$eflopdir/LLMDATA/mixed_inst_trans.json
-datapath=$eflopdir/LLMDATA/debug.json
+# datapath=$eflopdir/LLMDATA/debug.json
 # datapath=$eflopdir/LLMDATA/wmt19_en-zh.json
 # datapath=$eflopdir/LLMDATA/wmt_test.json
-modelpath=$eflopdir/MODELS/llama-7b-hf
-# modelpath=$eflopdir/MODELS/chavinlo-alpaca-native # 52K self-instructions SFT trained LLaMA
+# modelpath=$eflopdir/MODELS/llama-7b-hf
+# modelpath=/mnt/user/E-zhaoyingxiu.zyx-354256/LLMOUT/outputs/0503eflop_llama_gpt4_run0
+modelpath=$eflopdir/MODELS/chavinlo-alpaca-native # 52K self-instructions SFT trained LLaMA
 
 echo DATA: $datapath
+echo MODEL: $modelpath
 
 output=$eflopdir/LLMOUT/outputs/$exp
 log=$eflopdir/LLMOUT/logs/$exp.log
@@ -77,13 +83,14 @@ file=$eflopdir/CODE/ContinualLLM/dsrun.py
 # $eflopdir/xiuenvs/alpaca3.9/bin/wandb login b98a11d4688e1fb9308f6aaaed3e119d11a91aa4
 # run=$eflopdir/xiuenvs/alpaca3.9/bin/accelerate
 env=/mnt/user/E-zhaoyingxiu.zyx-354256/envs/py39/bin
-$env/wandb login b98a11d4688e1fb9308f6aaaed3e119d11a91aa4
 # run=accelerate
 # run=deepspeed
 run=$env/deepspeed
-ds_config=configs/ds_config.json
+ds_config=configs/ds_config.json #!
+# ds_config=configs/ds_lora_config.json
 echo deepspeed config $ds_config
 
+$env/wandb login b98a11d4688e1fb9308f6aaaed3e119d11a91aa4
 # $run config --config_file $eflopdir/accelerate_config.yaml
     # --mixed_precision=bf16 --num_processes=$ngpu --num_machines=1 \
 

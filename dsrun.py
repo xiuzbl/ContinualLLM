@@ -30,6 +30,7 @@ from transformers import (
     LlamaTokenizer, 
     get_linear_schedule_with_warmup, 
     # get_cosine_schedule_with_warmup,
+    AutoModelForCausalLM,
     set_seed,
 )
 from functools import partial
@@ -42,7 +43,7 @@ from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader, Dataset
 torch.autograd.set_detect_anomaly(True)
-# torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cuda.matmul.allow_tf32 = True
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def get_cosine_schedule_with_warmup(
@@ -170,7 +171,8 @@ def main(args):
     assert deepspeed_config['train_micro_batch_size_per_gpu'] == args.per_device_train_batch_size
 
     # model = LlamaForCausalLM.from_pretrained(args.model_name_or_path, device_map={"": device_id})
-    model = LlamaForCausalLM.from_pretrained(args.model_name_or_path)
+    # model = LlamaForCausalLM.from_pretrained(args.model_name_or_path)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, device_map={"": device_id})
 
     if args.add_lora:
         if rank<=0: logger.info('Add LoRA to the backbone model...')
@@ -233,14 +235,14 @@ def main(args):
         args.max_train_steps = math.ceil(args.num_epochs * num_update_steps_per_epoch)
 
     #* Set optimizer and scheduler, prepare them with accelerator.
-    # _, optimizer, trainable_param_names = get_optimizer(model, args)
+    _, optimizer, trainable_param_names = get_optimizer(model, args)
     # scheduler = get_scheduler(optimizer=optimizer, config=args)
     # scheduler = get_linear_schedule_with_warmup(
     #                 optimizer=optimizer, 
     #                 num_warmup_steps=args.warmup_steps, 
     #                 num_training_steps=args.max_train_steps
                 # )
-    optimizer = AdamW(params=model.parameters(), lr=args.lr) 
+    # optimizer = AdamW(params=model.parameters(), lr=args.lr) 
 
     # scheduler = get_cosine_schedule_with_warmup(
     #     optimizer=optimizer, 
@@ -249,14 +251,13 @@ def main(args):
     # )
     # print(f'scheduler first {scheduler}', flush=True)
     # model_parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    # model = model.to(device_id)
-    deepspeed_config["scheduler"]["params"]["total_num_steps"] = args.max_train_steps
-    deepspeed_config["scheduler"]["params"]["warmup_num_steps"] = math.ceil(args.warmup_ratio * args.max_train_steps) 
+    # deepspeed_config["scheduler"]["params"]["total_num_steps"] = args.max_train_steps
+    # deepspeed_config["scheduler"]["params"]["warmup_num_steps"] = math.ceil(args.warmup_ratio * args.max_train_steps) 
     model, optimizer, _, scheduler = deepspeed.initialize(
         model=model,
-        optimizer=optimizer,
         dist_init_required=False,
-        config=deepspeed_config
+        config=deepspeed_config,
+        optimizer=optimizer,
     )
         # lr_scheduler=scheduler,
         # args=args
@@ -280,6 +281,8 @@ def main(args):
     global_step = 0
     for epoch in range(args.num_epochs):
         model.train()
+        # model.optimizer.overflow = False
+
         logger.info(f"{'*'*10} EPOCH {epoch} {'*'*20}")
 
         steps_in_epoch = len(training_dataloader)
@@ -289,18 +292,18 @@ def main(args):
             #     print(f'batch {batch}', flush=True)
 
             # pdb.set_trace()
-            print(f'device {model.device}', flush=True)
+            # print(f'device {model.device}', flush=True)
             batch = to_device(batch, model.device)
             outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['labels'])
             # outputs = model(**batch)
             loss0 = outputs.loss
             # loss = loss0 / args.gradient_accumulation_steps
+            # model.backward(loss)
             model.backward(loss0)
-            # model.optimizer.backward(loss)
-            # model.micro_steps += 1
+            # model.optimizer.overflow = False
+            # if rank<=0: print(f'overflow: {model.optimizer.overflow}',flush=True)
 
             # print(f'batch:{step}; loss: {type(loss)} {loss}', flush=True)
-
             # if rank <= 0:
             #     logger.info(f'After optimization step memory INFO:') 
             #     logger.info(f'Allocated: {torch.cuda.memory_allocated()}')
@@ -308,7 +311,8 @@ def main(args):
             losses.append(loss0.item())
             # if rank<=0: print(f'ds_global_step:{model.global_steps}; ds_lr: {model.lr_scheduler.state_dict()}', flush=True)
             # loss = loss0 / args.gradient_accumulation_steps
-            if (step + 1) % args.gradient_accumulation_steps == 0 or (steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch):# last step in epoch but step is always smaller than gradient_accumulation_steps
+            # if (step + 1) % args.gradient_accumulation_steps == 0 or (steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch):# last step in epoch but step is always smaller than gradient_accumulation_steps
+            if model.is_gradient_accumulation_boundary():
                 # model.step()
                 # clip_grad_norm_(parameters=model.module.parameters(), max_norm=model.gradient_clipping(), mpu=model.mpu)
                 # model.optimizer.step()
@@ -319,15 +323,20 @@ def main(args):
 
                 global_step += 1
 
-                curr_lr = float(scheduler.get_last_lr()[0])
                 step_ratio = float(step/len(training_dataloader)*100)
             # if step % args.print_steps == 0:
-                if use_wandb: 
+                try:
+                    curr_lr = float(model.lr_scheduler.get_last_lr()[0])
+                    # curr_lr = float(scheduler.get_last_lr()[0])
                     wandb.log({"epoch":epoch, "learned_data_ratio": step_ratio, "training_loss": float(np.mean(losses)), "lr":curr_lr}, step=global_step)
-                if rank <= 0:
-                    train_writer.add_scalar('train/loss', float(np.mean(losses)), global_step)
-                    train_writer.add_scalar('lr',curr_lr, global_step)
-                    logger.info(f'EPOCH:{epoch}; GLOBAL STEP: {global_step}; STEP per epoch: {step}; learned_data_ratio: {"%.4f"%step_ratio}; training_loss_per_batch: {float(np.mean(losses))}; lr:{"%.8f"%curr_lr}')
+                    if rank<=0:
+                        logger.info(f'EPOCH:{epoch}; GLOBAL STEP: {global_step}; STEP per epoch: {step}; learned_data_ratio: {"%.4f"%step_ratio}; training_loss_per_batch: {float(np.mean(losses))}; lr:{"%.8f"%curr_lr}')
+                        train_writer.add_scalar('lr',curr_lr, global_step)
+                except:
+                    wandb.log({"epoch":epoch, "learned_data_ratio": step_ratio, "training_loss": float(np.mean(losses))}, step=global_step)
+                    if rank <= 0:
+                        logger.info(f'EPOCH:{epoch}; GLOBAL STEP: {global_step}; STEP per epoch: {step}; learned_data_ratio: {"%.4f"%step_ratio}; training_loss_per_batch: {float(np.mean(losses))}')
+                        train_writer.add_scalar('train/loss', float(np.mean(losses)), global_step)
                 losses = []
 
             if global_step >= args.max_train_steps:
@@ -344,8 +353,8 @@ def main(args):
             # logger.info(f'Begin saving model to {save_folder}')
             # save(model, tokenizer, save_folder)
             # model.save_checkpoint(save_folder)
-            if args.add_lora:
-                model.save_pretrained(os.path.join(args.output_dir,'epoch_'+str(epoch)))
+            # if args.add_lora:
+            #     model.save_pretrained(os.path.join(args.output_dir,'epoch_'+str(epoch)))
             logger.info(f'Finish saving model checkpoint of epoch {epoch}.')
 
     # # TODO: Save model checkpoints ---------------------------------

@@ -37,7 +37,9 @@ from ..utils import (
 
 
 if is_bnb_available():
-    import bitsandbytes as bnb
+    # import bitsandbytes as bnb
+    # pass
+    print(f'my setting: not use...')
 
 
 @dataclass

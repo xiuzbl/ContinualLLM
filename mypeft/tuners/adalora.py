@@ -25,11 +25,14 @@ from .lora import (
 
 
 def is_bnb_available():
-    return importlib.util.find_spec("bitsandbytes") is not None
+    # return importlib.util.find_spec("bitsandbytes") is not None
+    return None
 
 
 if is_bnb_available():
-    import bitsandbytes as bnb
+    # import bitsandbytes as bnb
+    # return
+    print('my setting: not use.')
 
 
 @dataclass
